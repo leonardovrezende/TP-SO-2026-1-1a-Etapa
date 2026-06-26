@@ -4,11 +4,13 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "TCB.h"
 
 typedef struct PCB PCB;
 
 PCB *leProcesso(FILE *f);
 void liberaProcesso(PCB *pcb);
-void inicializaMutexCond(PCB *pcb);
+TCB *criaThread(PCB *pcb, int tcbId);
+int getNumThreads(PCB *pcb);
 
 #endif
