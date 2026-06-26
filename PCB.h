@@ -12,5 +12,6 @@ PCB *leProcesso(FILE *f);
 void liberaProcesso(PCB *pcb);
 TCB *criaThread(PCB *pcb, int tcbId);
 int getNumThreads(PCB *pcb);
+int getStartTime(PCB *pcb);
 
 #endif

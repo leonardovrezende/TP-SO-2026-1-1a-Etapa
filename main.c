@@ -1,7 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/time.h>
 #include "PCB.h"
 
-void novaThread(TCB **threads, int n_threads, int aloc_threads, PCB *pcb, int pcbId){
+static void novaThread(TCB **threads, int n_threads, int aloc_threads, PCB *pcb, int pcbId){
     if(n_threads >= aloc_threads){
         aloc_threads *= 2;
         threads = realloc(threads, aloc_threads * sizeof(TCB*));  
@@ -26,6 +29,15 @@ int main(int argc, char *argv[])
         for(int j=0; j < getNumThreads(pcb_list[i]); j++){
             novaThread(threads, n_threads, aloc_threads, pcb_list[i], j);
         }
+    }
+
+    //insere processos na fila por tempo de chegada
+    PCB **filaProntos = calloc(n_processos, sizeof(PCB*));
+    struct timeval inicio, agora;
+    gettimeofday(&inicio, NULL);
+    for(int i=0; i < n_processos; i++){
+        usleep(getStartTime(pcb_list[i]));
+        filaProntos[i] = pcb_list[i];
     }
 
     fclose(f);

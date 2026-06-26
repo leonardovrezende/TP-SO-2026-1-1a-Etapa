@@ -1,4 +1,5 @@
 #include "PCB.h"
+#include <unistd.h>
 
 typedef enum
 {
@@ -45,6 +46,7 @@ PCB *leProcesso(FILE *f)
 
 void liberaProcesso(PCB *pcb)
 {
+   free(pcb->thread_ids);
    free(pcb);
 }
 
@@ -55,16 +57,31 @@ static void *routine(void *arg){
    while(pcb->state != RUNNING){
       pthread_cond_wait(&pcb->cv, &pcb->mutex);
    }
+   pcb->state = RUNNING;
+   pthread_mutex_unlock(&pcb->mutex);
+   
+   usleep(pcb->process_len/pcb->num_threads * 100); //fiquei na duvida sobre como determinar o tempo de execucao da thread. pensei assim.
+
+   pthread_mutex_lock(&pcb->mutex);
+   pcb->remaining_time -= pcb->process_len/pcb->num_threads * 100;
+   //se tempo do processo acabou, muda estado
+   if(pcb->remaining_time <= 0){
+      pcb->state = FINISHED;
+   }
    pthread_mutex_unlock(&pcb->mutex);
 
    return NULL;
 }
 
 TCB *criaThread(PCB *pcb, int tcbId){
-      pthread_create(&pcb->thread_ids[tcbId], NULL, &routine, (void*)pcb);
-      return criaTCB(pcb, tcbId);
+   pthread_create(&pcb->thread_ids[tcbId], NULL, &routine, (void*)pcb);
+   return criaTCB(pcb, tcbId);
 }
 
 int getNumThreads(PCB *pcb){
    return pcb->num_threads;
+}
+
+int getStartTime(PCB *pcb){
+   return pcb->start_time;
 }
