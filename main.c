@@ -1,48 +1,66 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <sys/time.h>
 #include "PCB.h"
-
-static void novaThread(TCB **threads, int n_threads, int aloc_threads, PCB *pcb, int pcbId){
-    if(n_threads >= aloc_threads){
-        aloc_threads *= 2;
-        threads = realloc(threads, aloc_threads * sizeof(TCB*));  
-    }
-    
-    threads[n_threads++] = criaThread(pcb, pcbId);
-}
+#include "TCB.h"
+#include "fila.h"
+#include "escalonador.h"
 
 int main(int argc, char *argv[])
 {
-    FILE *f = fopen(argv[1], "r");
-
-    int n_processos;
-    int n_threads = 0;
-    int aloc_threads = 3;
-    TCB **threads = calloc(aloc_threads, sizeof(TCB*));
-
-    fscanf(f, "%d%*c", &n_processos);
-    PCB **pcb_list = calloc(n_processos, sizeof(PCB*));
-    for (int i = 0; i < n_processos; i++){
-        pcb_list[i] = leProcesso(f);
-        for(int j=0; j < getNumThreads(pcb_list[i]); j++){
-            novaThread(threads, n_threads, aloc_threads, pcb_list[i], j);
-        }
+    if (argc < 2) {
+        fprintf(stderr, "uso: %s <arquivo>\n", argv[0]);
+        return 1;
     }
 
-    //insere processos na fila por tempo de chegada
-    PCB **filaProntos = calloc(n_processos, sizeof(PCB*));
-    struct timeval inicio, agora;
-    gettimeofday(&inicio, NULL);
-    for(int i=0; i < n_processos; i++){
-        usleep(getStartTime(pcb_list[i]));
-        filaProntos[i] = pcb_list[i];
+    FILE *f = fopen(argv[1], "r");
+    if (!f) {
+        perror("fopen");
+        return 1;
+    }
+
+    int n_processos;
+    if (fscanf(f, "%d", &n_processos) != 1) {
+        fprintf(stderr, "arquivo invalido\n");
+        fclose(f);
+        return 1;
+    }
+
+    int n_threads = 0;
+    int coloc_threads = 0;
+    
+    PCB **pcb_list = calloc(n_processos, sizeof(PCB*));
+    for (int i = 0; i < n_processos; i++){
+        pcb_list[i] = leProcesso(f, i);
+        n_threads += getNumThreads(pcb_list[i]);
+    }
+    int politica;
+    if(fscanf(f, "%d", &politica) != 1){
+        fprintf(stderr, "politica invalido\n");
+        fclose(f);
+        return 1;
     }
 
     fclose(f);
 
+    qsort(pcb_list, n_processos, sizeof(PCB*), ordenaPCB);
+    //insere processos na fila por tempo de chegada
+    FilaProntos *fila = criaFila(n_processos);
+    TCB **threads = calloc(n_threads, sizeof(TCB*));
+    int tempoAnterior = 0;
+    for(int i=0; i < n_processos; i++){
+        usleep((getStartTime(pcb_list[i]) - tempoAnterior) * 1000);
+        tempoAnterior = getStartTime(pcb_list[i]);
+        for(int j=0; j < getNumThreads(pcb_list[i]); j++){
+            threads[coloc_threads++] = criaThread(pcb_list[i], j);
+        }
+        insereFila(fila, pcb_list[i]);
+    }
+
     for (int i = 0; i < n_processos; i++)
         liberaProcesso(pcb_list[i]);
     free(pcb_list);
+    free(threads);
 }

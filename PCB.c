@@ -17,8 +17,9 @@ struct PCB
    pthread_t *thread_ids;
 };
 
-static void inicializaProcesso(PCB *pcb)
+static void inicializaProcesso(PCB *pcb, int i)
 {
+   pcb->pid = i;
    pthread_mutex_init(&pcb->mutex, NULL);
    pthread_cond_init(&pcb->cv, NULL);
    pcb->remaining_time = pcb->process_len;
@@ -26,14 +27,14 @@ static void inicializaProcesso(PCB *pcb)
    pcb->thread_ids = calloc(pcb->num_threads, sizeof(pthread_t));
 }
 
-PCB *leProcesso(FILE *f)
+PCB *leProcesso(FILE *f, int i)
 {
    PCB *pcb = calloc(1, sizeof(PCB));
    fscanf(f, "%d", &pcb->process_len);
    fscanf(f, "%d", &pcb->priority);
    fscanf(f, "%d", &pcb->num_threads);
    fscanf(f, "%d", &pcb->start_time);
-   inicializaProcesso(pcb);
+   inicializaProcesso(pcb, i);
 
    return pcb;
 }
@@ -54,10 +55,10 @@ static void *routine(void *arg){
    pcb->state = RUNNING;
    pthread_mutex_unlock(&pcb->mutex);
    
-   usleep(pcb->process_len/pcb->num_threads * 100); //fiquei na duvida sobre como determinar o tempo de execucao da thread. pensei assim.
+   usleep(pcb->process_len/pcb->num_threads * 1000); //fiquei na duvida sobre como determinar o tempo de execucao da thread. pensei assim.
 
    pthread_mutex_lock(&pcb->mutex);
-   pcb->remaining_time -= pcb->process_len/pcb->num_threads * 100;
+   pcb->remaining_time -= pcb->process_len/pcb->num_threads * 1000;
    //se tempo do processo acabou, muda estado
    if(pcb->remaining_time <= 0){
       pcb->state = FINISHED;
@@ -82,10 +83,6 @@ int getStartTime(PCB *pcb){
 
 int getPid(PCB *pcb){
    return pcb->pid;
-}
-
-void setPid(PCB *pcb, int pid){
-   pcb->pid = pid;
 }
 
 int getPriority(PCB *pcb){
@@ -118,4 +115,11 @@ void esperaPcb(PCB *pcb){
 
 void sinalizaPcb(PCB *pcb){
    pthread_cond_broadcast(&pcb->cv);
+}
+
+int ordenaPCB(const void *arg1, const void *arg2){
+   PCB *proc1 = *(PCB**) arg1;
+   PCB *proc2 = *(PCB**) arg2;
+
+   return proc1->start_time - proc2->start_time;
 }

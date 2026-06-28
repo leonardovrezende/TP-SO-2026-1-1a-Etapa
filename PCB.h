@@ -15,7 +15,7 @@ typedef enum
    FINISHED
 } ProcessState;
 
-PCB *leProcesso(FILE *f);
+PCB *leProcesso(FILE *f, int i);
 void liberaProcesso(PCB *pcb);
 TCB *criaThread(PCB *pcb, int tcbId);
 int getNumThreads(PCB *pcb);
@@ -32,6 +32,7 @@ void setEstado(PCB *pcb, ProcessState estado);
 void travaPcb(PCB *pcb);
 void destravaPcb(PCB *pcb);
 void esperaPcb(PCB *pcb);          
-void sinalizaPcb(PCB *pcb);       
+void sinalizaPcb(PCB *pcb);  
+int ordenaPCB(const void *arg1, const void *arg2);     
 
 #endif
