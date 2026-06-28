@@ -1,12 +1,6 @@
 #include "PCB.h"
+#include "TCB.h"
 #include <unistd.h>
-
-typedef enum
-{
-   READY,
-   RUNNING,
-   FINISHED
-} ProcessState;
 
 struct PCB
 {
@@ -84,4 +78,44 @@ int getNumThreads(PCB *pcb){
 
 int getStartTime(PCB *pcb){
    return pcb->start_time;
+}
+
+int getPid(PCB *pcb){
+   return pcb->pid;
+}
+
+void setPid(PCB *pcb, int pid){
+   pcb->pid = pid;
+}
+
+int getPriority(PCB *pcb){
+   return pcb->priority;
+}
+
+int getRemainingTime(PCB *pcb){
+   return pcb->remaining_time;
+}
+
+ProcessState getEstado(PCB *pcb){
+   return pcb->state;
+}
+
+void setEstado(PCB *pcb, ProcessState estado){
+   pcb->state = estado;
+}
+
+void travaPcb(PCB *pcb){
+   pthread_mutex_lock(&pcb->mutex);
+}
+
+void destravaPcb(PCB *pcb){
+   pthread_mutex_unlock(&pcb->mutex);
+}
+
+void esperaPcb(PCB *pcb){
+   pthread_cond_wait(&pcb->cv, &pcb->mutex);
+}
+
+void sinalizaPcb(PCB *pcb){
+   pthread_cond_broadcast(&pcb->cv);
 }

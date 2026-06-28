@@ -3,8 +3,6 @@
 
 #include "PCB.h"
 
-typedef struct TCB TCB;
-
 TCB *criaTCB(PCB *pcb, int id);
 
 #endif
