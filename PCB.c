@@ -49,12 +49,15 @@ static void *routine(void *arg){
    PCB *pcb = (PCB*) arg;
 
    pthread_mutex_lock(&pcb->mutex);
-   while(pcb->state != RUNNING){
+   while(pcb->state != RUNNING && pcb->state != FINISHED){
       pthread_cond_wait(&pcb->cv, &pcb->mutex);
    }
-   pcb->state = RUNNING;
+   if(pcb->state == FINISHED){
+      pthread_mutex_unlock(&pcb->mutex);
+      return NULL;
+   }
    pthread_mutex_unlock(&pcb->mutex);
-   
+
    usleep(pcb->process_len/pcb->num_threads * 1000); //fiquei na duvida sobre como determinar o tempo de execucao da thread. pensei assim.
 
    pthread_mutex_lock(&pcb->mutex);
@@ -62,6 +65,7 @@ static void *routine(void *arg){
    //se tempo do processo acabou, muda estado
    if(pcb->remaining_time <= 0){
       pcb->state = FINISHED;
+      pthread_cond_broadcast(&pcb->cv);
    }
    pthread_mutex_unlock(&pcb->mutex);
 
@@ -115,6 +119,11 @@ void esperaPcb(PCB *pcb){
 
 void sinalizaPcb(PCB *pcb){
    pthread_cond_broadcast(&pcb->cv);
+}
+
+void joinThreads(PCB *pcb){
+   for(int i = 0; i < pcb->num_threads; i++)
+      pthread_join(pcb->thread_ids[i], NULL);
 }
 
 int ordenaPCB(const void *arg1, const void *arg2){

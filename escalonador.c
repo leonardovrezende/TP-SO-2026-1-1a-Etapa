@@ -11,6 +11,7 @@ struct Escalonador
    int quantum_ms;
 
    PCB *current_process;
+   FILE *log_file;
 };
 
 static const char *rotulo(TipoEscalonador tipo)
@@ -57,13 +58,16 @@ static void escalonaFCFS(Escalonador *esc)
    PCB *pcb;
    while ((pcb = esperaProximo(esc->fila)) != NULL)
    {
+      fprintf(esc->log_file, "[FCFS] Executando processo PID %d\n", getPid(pcb));
+
       despacha(esc, pcb);
-                                                         
+
       travaPcb(pcb);
       while (getEstado(pcb) != FINISHED)
          esperaPcb(pcb);
       destravaPcb(pcb);
 
+      fprintf(esc->log_file, "[FCFS] Processo PID %d finalizado\n", getPid(pcb));
       esc->current_process = NULL;
    }
 }
@@ -83,6 +87,8 @@ void *rotinaEscalonador(void *arg)
 {
    Escalonador *esc = (Escalonador *)arg;
 
+   esc->log_file = fopen("log_execucao_minikernel.txt", "w");
+
    switch (esc->tipo)
    {
    case POL_RR:
@@ -96,6 +102,10 @@ void *rotinaEscalonador(void *arg)
       escalonaFCFS(esc);
       break;
    }
+
+   fprintf(esc->log_file, "Escalonador terminou execução de todos processos\n");
+   fclose(esc->log_file);
+   esc->log_file = NULL;
 
    return NULL;
 }

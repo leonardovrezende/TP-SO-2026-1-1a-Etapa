@@ -31,8 +31,9 @@ void setEstado(PCB *pcb, ProcessState estado);
 
 void travaPcb(PCB *pcb);
 void destravaPcb(PCB *pcb);
-void esperaPcb(PCB *pcb);          
-void sinalizaPcb(PCB *pcb);  
-int ordenaPCB(const void *arg1, const void *arg2);     
+void esperaPcb(PCB *pcb);
+void sinalizaPcb(PCB *pcb);
+void joinThreads(PCB *pcb);
+int ordenaPCB(const void *arg1, const void *arg2);
 
 #endif

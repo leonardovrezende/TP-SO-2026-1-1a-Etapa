@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
     
     PCB **pcb_list = calloc(n_processos, sizeof(PCB*));
     for (int i = 0; i < n_processos; i++){
-        pcb_list[i] = leProcesso(f, i);
+        pcb_list[i] = leProcesso(f, i + 1);
         n_threads += getNumThreads(pcb_list[i]);
     }
     int politica;
@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
     qsort(pcb_list, n_processos, sizeof(PCB*), ordenaPCB);
     //insere processos na fila por tempo de chegada
     FilaProntos *fila = criaFila(n_processos);
+    Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS);
+
     TCB **threads = calloc(n_threads, sizeof(TCB*));
     int tempoAnterior = 0;
     for(int i=0; i < n_processos; i++){
@@ -59,8 +61,21 @@ int main(int argc, char *argv[])
         insereFila(fila, pcb_list[i]);
     }
 
+    pthread_t esc_tid;
+    pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
+    marcaGeradorPronto(fila);
+
+    pthread_join(esc_tid, NULL);
+
+    for(int i = 0; i < n_processos; i++)
+        joinThreads(pcb_list[i]);
+
     for (int i = 0; i < n_processos; i++)
         liberaProcesso(pcb_list[i]);
     free(pcb_list);
     free(threads);
+    liberaFila(fila);
+    liberaEscalonador(esc);
+
+    return 0;
 }
