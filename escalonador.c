@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 
 struct Escalonador
 {
@@ -60,12 +61,13 @@ static void escalonaFCFS(Escalonador *esc)
    {
       fprintf(esc->log_file, "[FCFS] Executando processo PID %d\n", getPid(pcb));
 
-      despacha(esc, pcb);
-
-      travaPcb(pcb);
-      while (getEstado(pcb) != FINISHED)
-         esperaPcb(pcb);
-      destravaPcb(pcb);
+      while (getEstado(pcb) != FINISHED) {
+         despacha(esc, pcb);
+         travaPcb(pcb);
+         while (getEstado(pcb) == RUNNING)
+            esperaPcb(pcb); /* aguarda threads sinalizarem READY ou FINISHED */
+         destravaPcb(pcb);
+      }
 
       fprintf(esc->log_file, "[FCFS] Processo PID %d finalizado\n", getPid(pcb));
       esc->current_process = NULL;
@@ -74,8 +76,29 @@ static void escalonaFCFS(Escalonador *esc)
 
 static void escalonaRR(Escalonador *esc)
 {
-   /* TODO: implementar a preempcao por quantum. */
-   escalonaFCFS(esc);
+   PCB *pcb;
+   while ((pcb = esperaProximo(esc->fila)) != NULL)
+   {
+      fprintf(esc->log_file, "[RR] Executando processo PID %d com quantum %dms\n",
+              getPid(pcb), esc->quantum_ms);
+
+      despacha(esc, pcb);
+
+      usleep(esc->quantum_ms * 1000);
+
+      travaPcb(pcb);
+      while (getEstado(pcb) == RUNNING)
+         esperaPcb(pcb); /* aguarda thread sinalizar FINISHED ou READY */
+      if (getEstado(pcb) == FINISHED) {
+         destravaPcb(pcb);
+         fprintf(esc->log_file, "[RR] Processo PID %d finalizado\n", getPid(pcb));
+      } else {
+         setEstado(pcb, READY);
+         destravaPcb(pcb);
+         insereFila(esc->fila, pcb);
+      }
+      esc->current_process = NULL;
+   }
 }
 
 static void escalonaPrioridade(Escalonador *esc)

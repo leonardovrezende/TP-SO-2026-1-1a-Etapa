@@ -45,31 +45,35 @@ void liberaProcesso(PCB *pcb)
    free(pcb);
 }
 
+#define QUANTUM_MS 500
+
 static void *routine(void *arg){
    PCB *pcb = (PCB*) arg;
 
-   pthread_mutex_lock(&pcb->mutex);
-   while(pcb->state != RUNNING && pcb->state != FINISHED){
-      pthread_cond_wait(&pcb->cv, &pcb->mutex);
-   }
-   if(pcb->state == FINISHED){
+   while (1) {
+      pthread_mutex_lock(&pcb->mutex);
+      while(pcb->state != RUNNING && pcb->state != FINISHED)
+         pthread_cond_wait(&pcb->cv, &pcb->mutex);
+      if(pcb->state == FINISHED){
+         pthread_mutex_unlock(&pcb->mutex);
+         return NULL;
+      }
       pthread_mutex_unlock(&pcb->mutex);
-      return NULL;
+
+      usleep(QUANTUM_MS * 1000 / pcb->num_threads);
+
+      pthread_mutex_lock(&pcb->mutex);
+      pcb->remaining_time -= QUANTUM_MS / pcb->num_threads;
+      if(pcb->remaining_time <= 0){
+         pcb->state = FINISHED;
+         pthread_cond_broadcast(&pcb->cv);
+         pthread_mutex_unlock(&pcb->mutex);
+         return NULL;
+      }
+      pcb->state = READY;
+      pthread_cond_broadcast(&pcb->cv); /* acorda escalonador RR que aguarda fim do quantum */
+      pthread_mutex_unlock(&pcb->mutex);
    }
-   pthread_mutex_unlock(&pcb->mutex);
-
-   usleep(pcb->process_len/pcb->num_threads * 1000); //fiquei na duvida sobre como determinar o tempo de execucao da thread. pensei assim.
-
-   pthread_mutex_lock(&pcb->mutex);
-   pcb->remaining_time -= pcb->process_len/pcb->num_threads * 1000;
-   //se tempo do processo acabou, muda estado
-   if(pcb->remaining_time <= 0){
-      pcb->state = FINISHED;
-      pthread_cond_broadcast(&pcb->cv);
-   }
-   pthread_mutex_unlock(&pcb->mutex);
-
-   return NULL;
 }
 
 TCB *criaThread(PCB *pcb, int tcbId){
@@ -95,6 +99,10 @@ int getPriority(PCB *pcb){
 
 int getRemainingTime(PCB *pcb){
    return pcb->remaining_time;
+}
+
+void setRemainingTime(PCB *pcb, int t){
+   pcb->remaining_time = t;
 }
 
 ProcessState getEstado(PCB *pcb){

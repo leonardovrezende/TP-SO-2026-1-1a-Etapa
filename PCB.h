@@ -24,7 +24,8 @@ int getStartTime(PCB *pcb);
 int getPid(PCB *pcb);
 void setPid(PCB *pcb, int pid);
 int getPriority(PCB *pcb);
-int getRemainingTime(PCB *pcb);    
+int getRemainingTime(PCB *pcb);
+void setRemainingTime(PCB *pcb, int t);
 
 ProcessState getEstado(PCB *pcb);
 void setEstado(PCB *pcb, ProcessState estado);
