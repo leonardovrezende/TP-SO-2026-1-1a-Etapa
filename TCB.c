@@ -12,3 +12,7 @@ TCB *criaTCB(PCB *pcb, int id){
     tcb->thread_index = id;
     return tcb;
 }
+
+void liberaTCB(TCB *tcb){
+    free(tcb);
+}

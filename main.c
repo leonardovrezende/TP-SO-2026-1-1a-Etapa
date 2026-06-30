@@ -73,7 +73,11 @@ int main(int argc, char *argv[])
     for (int i = 0; i < n_processos; i++)
         liberaProcesso(pcb_list[i]);
     free(pcb_list);
+
+    for (int i = 0; i < n_threads; i++)
+        liberaTCB(threads[i]);
     free(threads);
+
     liberaFila(fila);
     liberaEscalonador(esc);
 

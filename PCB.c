@@ -41,6 +41,8 @@ PCB *leProcesso(FILE *f, int i)
 
 void liberaProcesso(PCB *pcb)
 {
+   pthread_mutex_destroy(&pcb->mutex);
+   pthread_cond_destroy(&pcb->cv);
    free(pcb->thread_ids);
    free(pcb);
 }
