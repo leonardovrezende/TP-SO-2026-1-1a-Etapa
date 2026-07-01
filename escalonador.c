@@ -103,7 +103,50 @@ static void escalonaRR(Escalonador *esc)
 
 static void escalonaPrioridade(Escalonador *esc)
 {
-   escalonaFCFS(esc);
+   PCB *pcb;
+   while ((pcb = esperaPrioritario(esc->fila)) != NULL)
+   {
+      fprintf(esc->log_file, "[PRIORITY] Executando processo PID %d prioridade %d\n",
+              getPid(pcb), getPriority(pcb));
+
+      while (getEstado(pcb) != FINISHED)
+      {
+         int preempted = 0;
+         despacha(esc, pcb);
+
+         travaPcb(pcb);
+         while (getEstado(pcb) == RUNNING)
+         {
+            PCB *prox = maiorPrioridade(esc->fila, pcb);
+            if (prox != NULL)
+            {
+               setEstado(pcb, READY);
+               destravaPcb(pcb);
+               insereFila(esc->fila, pcb);
+               pcb = prox;
+               preempted = 1;
+               fprintf(esc->log_file, "[PRIORITY] Executando processo PID %d prioridade %d\n",
+                        getPid(pcb), getPriority(pcb));
+               break;
+            }
+            esperaPcb(pcb);
+         }
+
+         if (preempted)
+            continue;
+
+         if (getEstado(pcb) == FINISHED)
+         {
+            destravaPcb(pcb);
+            break;
+         }
+
+         destravaPcb(pcb);
+      }
+
+      fprintf(esc->log_file, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb));
+      esc->current_process = NULL;
+   }
 }
 
 void *rotinaEscalonador(void *arg)

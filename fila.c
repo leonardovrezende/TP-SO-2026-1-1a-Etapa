@@ -147,6 +147,22 @@ int geradorPronto(FilaProntos *fila)
    return pronto;
 }
 
+static PCB *removeIndex(FilaProntos *fila, int index)
+{
+   int abs = (fila->inicio + index) % fila->capacidade;
+   PCB *pcb = fila->itens[abs];
+   for (int i = index; i < fila->qtd - 1; i++)
+   {
+      int a = (fila->inicio + i) % fila->capacidade;
+      int b = (fila->inicio + i + 1) % fila->capacidade;
+      fila->itens[a] = fila->itens[b];
+   }
+   int ultimo = (fila->inicio + fila->qtd - 1) % fila->capacidade;
+   fila->itens[ultimo] = NULL;
+   fila->qtd--;
+   return pcb;
+}
+
 PCB *esperaProximo(FilaProntos *fila)
 {
    pthread_mutex_lock(&fila->mutex);
@@ -157,4 +173,61 @@ PCB *esperaProximo(FilaProntos *fila)
    PCB *pcb = removeInicio(fila);
    pthread_mutex_unlock(&fila->mutex);
    return pcb;
+}
+
+static PCB *maiorPrioridadeLocked(FilaProntos *fila, PCB *atual)
+{
+   if (atual == NULL)
+      return NULL;
+
+   int prioAtual = getPriority(atual);
+   int melhor_rel = -1;
+   int menor_prio = prioAtual;
+
+   for (int i = 0; i < fila->qtd; i++)
+   {
+      int pos = (fila->inicio + i) % fila->capacidade;
+      PCB *cand = fila->itens[pos];
+      int prioTeste = getPriority(cand);
+      if (prioTeste < menor_prio)
+      {
+         menor_prio = prioTeste;
+         melhor_rel = i;
+      }
+   }
+
+   PCB *prox = NULL;
+   if (melhor_rel >= 0)
+      prox = removeIndex(fila, melhor_rel);
+
+   return prox;
+}
+
+PCB *esperaPrioritario(FilaProntos *fila)
+{
+   pthread_mutex_lock(&fila->mutex);
+
+   while (fila->qtd == 0 && !fila->generator_done)
+      pthread_cond_wait(&fila->cond, &fila->mutex);
+
+   PCB *pcb = fila->itens[fila->inicio];
+   PCB *comp = maiorPrioridadeLocked(fila, pcb);
+   if (comp != NULL)
+      pcb = comp;
+   else
+   {
+      fila->itens[fila->inicio] = NULL;
+      fila->inicio = (fila->inicio + 1) % fila->capacidade;
+      fila->qtd--;
+   }
+   pthread_mutex_unlock(&fila->mutex);
+   return pcb;
+}
+
+PCB *maiorPrioridade(FilaProntos *fila, PCB *atual)
+{
+   pthread_mutex_lock(&fila->mutex);
+   PCB *res = maiorPrioridadeLocked(fila, atual);
+   pthread_mutex_unlock(&fila->mutex);
+   return res;
 }

@@ -19,5 +19,8 @@ void marcaGeradorPronto(FilaProntos *fila);
 int geradorPronto(FilaProntos *fila);
 
 PCB *esperaProximo(FilaProntos *fila);
+PCB *esperaPrioritario(FilaProntos *fila);
+
+PCB *maiorPrioridade(FilaProntos *fila, PCB *atual);
 
 #endif
