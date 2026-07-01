@@ -51,6 +51,10 @@ int main(int argc, char *argv[])
     Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS);
 
     TCB **threads = calloc(n_threads, sizeof(TCB*));
+
+    pthread_t esc_tid;
+    pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
+
     int tempoAnterior = 0;
     for(int i=0; i < n_processos; i++){
         usleep((getStartTime(pcb_list[i]) - tempoAnterior) * 1000);
@@ -60,9 +64,6 @@ int main(int argc, char *argv[])
         }
         insereFila(fila, pcb_list[i]);
     }
-
-    pthread_t esc_tid;
-    pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
     marcaGeradorPronto(fila);
 
     pthread_join(esc_tid, NULL);
