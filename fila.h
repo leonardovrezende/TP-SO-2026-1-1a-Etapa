@@ -9,6 +9,8 @@ FilaProntos *criaFila(int capacidade);
 void liberaFila(FilaProntos *fila);
 
 void insereFila(FilaProntos *fila, PCB *pcb);     
+void insereHeap(FilaProntos *fila, PCB *pcb); 
+
 PCB *removeFila(FilaProntos *fila);               
 PCB *removePcbFila(FilaProntos *fila, PCB *pcb);  
 
@@ -22,5 +24,9 @@ PCB *esperaProximo(FilaProntos *fila);
 PCB *esperaPrioritario(FilaProntos *fila);
 
 PCB *maiorPrioridade(FilaProntos *fila, PCB *atual);
+
+//TESTE HEAP
+void heap_push(FilaProntos *h, PCB *PCB);
+PCB *heap_pop(FilaProntos *h);
 
 #endif

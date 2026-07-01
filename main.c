@@ -62,7 +62,8 @@ int main(int argc, char *argv[])
         for(int j=0; j < getNumThreads(pcb_list[i]); j++){
             threads[coloc_threads++] = criaThread(pcb_list[i], j);
         }
-        insereFila(fila, pcb_list[i]);
+        if(politica == 3) insereHeap(fila, pcb_list[i]);
+        else insereFila(fila, pcb_list[i]);
     }
     marcaGeradorPronto(fila);
 
