@@ -48,12 +48,17 @@ int main(int argc, char *argv[])
     qsort(pcb_list, n_processos, sizeof(PCB*), ordenaPCB);
     //insere processos na fila por tempo de chegada
     FilaProntos *fila = criaFila(n_processos);
-    Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS);
-
     TCB **threads = calloc(n_threads, sizeof(TCB*));
 
-    pthread_t esc_tid;
+    Log *log = inicializaLog();
+    pthread_t esc_tid, esc_tid2;
+    Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS, 0, log);
+    Escalonador *esc2;
     pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
+    if(NUM_CPUS == 2){
+        esc2 = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS, 1, log);
+        pthread_create(&esc_tid2, NULL, rotinaEscalonador, esc2);
+    }
 
     int tempoAnterior = 0;
     for(int i=0; i < n_processos; i++){
@@ -68,9 +73,15 @@ int main(int argc, char *argv[])
     marcaGeradorPronto(fila);
 
     pthread_join(esc_tid, NULL);
+    if(NUM_CPUS == 2) pthread_join(esc_tid2, NULL);
 
-    for(int i = 0; i < n_processos; i++)
+    for(int i = 0; i < n_processos; i++){
         joinThreads(pcb_list[i]);
+        //logWrite(log, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb_list[i]));
+    }
+
+    logWrite(log, "Escalonador terminou execução de todos processos\n");
+    liberaLog(log);
 
     for (int i = 0; i < n_processos; i++)
         liberaProcesso(pcb_list[i]);
@@ -82,6 +93,7 @@ int main(int argc, char *argv[])
 
     liberaFila(fila);
     liberaEscalonador(esc);
+    if(NUM_CPUS == 2) liberaEscalonador(esc2);
 
     return 0;
 }

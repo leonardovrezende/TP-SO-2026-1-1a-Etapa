@@ -5,15 +5,43 @@
 #include <string.h>
 #include <unistd.h>
 
+struct log {
+   FILE *log_file;
+   pthread_mutex_t mutex_file;
+};
+
 struct Escalonador
 {
    TipoEscalonador tipo;
    FilaProntos *fila;
    int quantum_ms;
+   int cpu_id;
 
    PCB *current_process;
-   FILE *log_file;
+   Log *log;
 };
+
+Log *inicializaLog(){
+   Log *l = calloc(1, sizeof(Log));
+   l->log_file = fopen("log_execucao_minikernel.txt", "w");
+   pthread_mutex_init(&l->mutex_file, NULL);
+   return l;
+}
+
+void liberaLog(Log *l){
+   fclose(l->log_file);
+   pthread_mutex_destroy(&l->mutex_file);
+   free(l);
+}
+
+void logWrite(Log *l, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    pthread_mutex_lock(&l->mutex_file);
+    vfprintf(l->log_file, fmt, args);
+    pthread_mutex_unlock(&l->mutex_file);
+    va_end(args);
+}
 
 static const char *rotulo(TipoEscalonador tipo)
 {
@@ -30,13 +58,15 @@ static const char *rotulo(TipoEscalonador tipo)
    }
 }
 
-Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms)
+Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms, int cpu_id, Log *log)
 {
    Escalonador *esc = calloc(1, sizeof(Escalonador));
    esc->tipo = tipo;
    esc->fila = fila;
    esc->quantum_ms = quantum_ms;
+   esc->cpu_id = cpu_id;
    esc->current_process = NULL;
+   esc->log = log;
    return esc;
 }
 
@@ -59,7 +89,8 @@ static void escalonaFCFS(Escalonador *esc)
    PCB *pcb;
    while ((pcb = esperaProximo(esc->fila)) != NULL)
    {
-      fprintf(esc->log_file, "[FCFS] Executando processo PID %d\n", getPid(pcb));
+      if(NUM_CPUS == 2) logWrite(esc->log, "[FCFS] Executando processo PID %d // processador %d\n", getPid(pcb), esc->cpu_id);
+      else logWrite(esc->log, "[FCFS] Executando processo PID %d\n", getPid(pcb));
 
       while (getEstado(pcb) != FINISHED) {
          despacha(esc, pcb);
@@ -69,7 +100,7 @@ static void escalonaFCFS(Escalonador *esc)
          destravaPcb(pcb);
       }
 
-      fprintf(esc->log_file, "[FCFS] Processo PID %d finalizado\n", getPid(pcb));
+      logWrite(esc->log, "[FCFS] Processo PID %d finalizado\n", getPid(pcb));
       esc->current_process = NULL;
    }
 }
@@ -79,7 +110,9 @@ static void escalonaRR(Escalonador *esc)
    PCB *pcb;
    while ((pcb = esperaProximo(esc->fila)) != NULL)
    {
-      fprintf(esc->log_file, "[RR] Executando processo PID %d com quantum %dms\n",
+      if(NUM_CPUS == 2) logWrite(esc->log, "[RR] Executando processo PID %d com quantum %dms // processador %d\n",
+              getPid(pcb), esc->quantum_ms, esc->cpu_id);
+      else logWrite(esc->log, "[RR] Executando processo PID %d com quantum %dms\n",
               getPid(pcb), esc->quantum_ms);
 
       despacha(esc, pcb);
@@ -91,7 +124,7 @@ static void escalonaRR(Escalonador *esc)
          esperaPcb(pcb); /* aguarda thread sinalizar FINISHED ou READY */
       if (getEstado(pcb) == FINISHED) {
          destravaPcb(pcb);
-         fprintf(esc->log_file, "[RR] Processo PID %d finalizado\n", getPid(pcb));
+         logWrite(esc->log, "[RR] Processo PID %d finalizado\n", getPid(pcb));
       } else {
          setEstado(pcb, READY);
          destravaPcb(pcb);
@@ -106,7 +139,9 @@ static void escalonaPrioridade(Escalonador *esc)
    PCB *pcb;
    while ((pcb = esperaPrioritario(esc->fila)) != NULL)
    {
-      fprintf(esc->log_file, "[PRIORITY] Executando processo PID %d prioridade %d\n",
+      if(NUM_CPUS == 2) logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d // processador %d\n",
+              getPid(pcb), getPriority(pcb), esc->cpu_id);
+      else logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d\n",
               getPid(pcb), getPriority(pcb));
 
       while (getEstado(pcb) != FINISHED)
@@ -125,7 +160,10 @@ static void escalonaPrioridade(Escalonador *esc)
                insereFila(esc->fila, pcb);
                pcb = prox;
                preempted = 1;
-               fprintf(esc->log_file, "[PRIORITY] Executando processo PID %d prioridade %d\n",
+
+               if(NUM_CPUS == 2) logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d // processador %d\n",
+                        getPid(pcb), getPriority(pcb), esc->cpu_id);
+               else logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d\n",
                         getPid(pcb), getPriority(pcb));
                break;
             }
@@ -144,7 +182,7 @@ static void escalonaPrioridade(Escalonador *esc)
          destravaPcb(pcb);
       }
 
-      fprintf(esc->log_file, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb));
+      logWrite(esc->log, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb));
       esc->current_process = NULL;
    }
 }
@@ -153,7 +191,7 @@ void *rotinaEscalonador(void *arg)
 {
    Escalonador *esc = (Escalonador *)arg;
 
-   esc->log_file = fopen("log_execucao_minikernel.txt", "w");
+   //esc->log_file = fopen("log_execucao_minikernel.txt", "w");
 
    switch (esc->tipo)
    {
@@ -169,9 +207,9 @@ void *rotinaEscalonador(void *arg)
       break;
    }
 
-   fprintf(esc->log_file, "Escalonador terminou execução de todos processos\n");
-   fclose(esc->log_file);
-   esc->log_file = NULL;
+   //logWrite(esc->log, "Escalonador terminou execução de todos processos\n");
+   //fclose(esc->log);
+   //esc->log = NULL;
 
    return NULL;
 }

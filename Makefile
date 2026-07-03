@@ -8,10 +8,10 @@ SRCS = PCB.c TCB.c fila.c escalonador.c main.c
 all: monoprocessador
 
 monoprocessador: $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
+	$(CC) $(CFLAGS) -DNUM_CPUS=1 -o $(TARGET) $(SRCS)
 
 multiprocessador: $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
+	$(CC) $(CFLAGS) -DNUM_CPUS=2 -o $(TARGET) $(SRCS)
 
 clean:
 	rm -f $(TARGET)

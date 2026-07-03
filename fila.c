@@ -14,6 +14,61 @@ struct FilaProntos
    pthread_cond_t cond;
 };
 
+// HEAP FUNÇÕES LOCAIS
+#define pai(i) (i - 1) / 2
+#define esquerda(i) 2 * i + 1
+#define direita(i) 2 * i + 2
+
+static void trocaPCB(PCB **a, PCB **b) {
+    PCB *temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+static void heapify_up(FilaProntos *h, int i) {
+    while (i > 0 && getPriority(h->itens[pai(i)]) > getPriority(h->itens[i])) {
+        trocaPCB(&h->itens[pai(i)], &h->itens[i]);
+        i = pai(i);
+    }
+}
+
+static void heapify_down(FilaProntos *h, int i) {
+    int menor = i;
+    int esq = esquerda(i);
+    int dir = direita(i);
+
+    if (esq < h->qtd && getPriority(h->itens[esq]) < getPriority(h->itens[menor]))
+        menor = esq;
+    if (dir < h->qtd && getPriority(h->itens[dir]) < getPriority(h->itens[menor]))
+        menor = dir;
+
+    if (menor != i) {
+        trocaPCB(&h->itens[i], &h->itens[menor]);
+        heapify_down(h, menor);
+    }
+}
+
+static void heap_push(FilaProntos *h, PCB *PCB) {
+    if (h->qtd >= h->capacidade) 
+        return;
+    h->itens[h->qtd] = PCB;
+    heapify_up(h, h->qtd);
+    h->qtd++;
+}
+
+static PCB *heap_pop(FilaProntos *h) {
+    if (h->qtd == 0)
+        return NULL;
+    PCB *menor = h->itens[0];
+    h->qtd--;
+    h->itens[0] = h->itens[h->qtd];
+    heapify_down(h, 0);
+    return menor;
+}
+
+
+// Funções da fila de prontos
+
 FilaProntos *criaFila(int capacidade)
 {
    if (capacidade < 1)
@@ -71,8 +126,8 @@ void insereHeap(FilaProntos *fila, PCB *pcb)
    pthread_mutex_lock(&fila->mutex);
 
    heap_push(fila, pcb);
-
    pthread_cond_signal(&fila->cond);
+
    pthread_mutex_unlock(&fila->mutex);
 }
 
@@ -185,34 +240,6 @@ PCB *esperaProximo(FilaProntos *fila)
    return pcb;
 }
 
-static PCB *maiorPrioridadeLocked(FilaProntos *fila, PCB *atual)
-{
-   if (atual == NULL)
-      return NULL;
-
-   int prioAtual = getPriority(atual);
-   int melhor_rel = -1;
-   int menor_prio = prioAtual;
-
-   for (int i = 0; i < fila->qtd; i++)
-   {
-      int pos = (fila->inicio + i) % fila->capacidade;
-      PCB *cand = fila->itens[pos];
-      int prioTeste = getPriority(cand);
-      if (prioTeste < menor_prio)
-      {
-         menor_prio = prioTeste;
-         melhor_rel = i;
-      }
-   }
-
-   PCB *prox = NULL;
-   if (melhor_rel >= 0)
-      prox = removeIndex(fila, melhor_rel);
-
-   return prox;
-}
-
 PCB *esperaPrioritario(FilaProntos *fila)
 {
    pthread_mutex_lock(&fila->mutex);
@@ -221,16 +248,6 @@ PCB *esperaPrioritario(FilaProntos *fila)
       pthread_cond_wait(&fila->cond, &fila->mutex);
    }
 
-   /*PCB *pcb = fila->itens[fila->inicio];
-   PCB *comp = maiorPrioridadeLocked(fila, pcb);
-   if (comp != NULL)
-      pcb = comp;
-   else
-   {
-      fila->itens[fila->inicio] = NULL;
-      fila->inicio = (fila->inicio + 1) % fila->capacidade;
-      fila->qtd--;
-   }*/
    PCB *pcb = heap_pop(fila);
    pthread_mutex_unlock(&fila->mutex);
    return pcb;
@@ -239,7 +256,6 @@ PCB *esperaPrioritario(FilaProntos *fila)
 PCB *maiorPrioridade(FilaProntos *fila, PCB *atual)
 {
    pthread_mutex_lock(&fila->mutex);
-   //PCB *res = maiorPrioridadeLocked(fila, atual);
    PCB *res = heap_pop(fila);
    if(res == NULL) {
       pthread_mutex_unlock(&fila->mutex);
@@ -252,56 +268,4 @@ PCB *maiorPrioridade(FilaProntos *fila, PCB *atual)
    }
    pthread_mutex_unlock(&fila->mutex);
    return res;
-}
-
-// TESTE HEAP
-#define pai(i) (i - 1) / 2
-#define esquerda(i) 2 * i + 1
-#define direita(i) 2 * i + 2
-
-void trocaPCB(PCB **a, PCB **b) {
-    PCB *temp = *a;
-    *a = *b;
-    *b = temp;
-}
-
-void heapify_up(FilaProntos *h, int i) {
-    while (i > 0 && getPriority(h->itens[pai(i)]) > getPriority(h->itens[i])) {
-        trocaPCB(&h->itens[pai(i)], &h->itens[i]);
-        i = pai(i);
-    }
-}
-
-void heapify_down(FilaProntos *h, int i) {
-    int menor = i;
-    int esq = esquerda(i);
-    int dir = direita(i);
-
-    if (esq < h->qtd && getPriority(h->itens[esq]) < getPriority(h->itens[menor]))
-        menor = esq;
-    if (dir < h->qtd && getPriority(h->itens[dir]) < getPriority(h->itens[menor]))
-        menor = dir;
-
-    if (menor != i) {
-        trocaPCB(&h->itens[i], &h->itens[menor]);
-        heapify_down(h, menor);
-    }
-}
-
-void heap_push(FilaProntos *h, PCB *PCB) {
-    if (h->qtd >= h->capacidade) 
-        return;
-    h->itens[h->qtd] = PCB;
-    heapify_up(h, h->qtd);
-    h->qtd++;
-}
-
-PCB *heap_pop(FilaProntos *h) {
-    if (h->qtd == 0)
-        return NULL;
-    PCB *menor = h->itens[0];
-    h->qtd--;
-    h->itens[0] = h->itens[h->qtd];
-    heapify_down(h, 0);
-    return menor;
 }

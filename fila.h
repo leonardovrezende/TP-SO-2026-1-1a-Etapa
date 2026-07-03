@@ -21,12 +21,9 @@ void marcaGeradorPronto(FilaProntos *fila);
 int geradorPronto(FilaProntos *fila);
 
 PCB *esperaProximo(FilaProntos *fila);
-PCB *esperaPrioritario(FilaProntos *fila);
 
+PCB *esperaPrioritario(FilaProntos *fila);
 PCB *maiorPrioridade(FilaProntos *fila, PCB *atual);
 
-//TESTE HEAP
-void heap_push(FilaProntos *h, PCB *PCB);
-PCB *heap_pop(FilaProntos *h);
 
 #endif

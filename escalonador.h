@@ -12,10 +12,18 @@ typedef enum
 } TipoEscalonador;
 
 #define QUANTUM_PADRAO_MS 500
+#ifndef NUM_CPUS
+#define NUM_CPUS 1
+#endif
 
+typedef struct log Log;
 typedef struct Escalonador Escalonador;
 
-Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms);
+Log *inicializaLog();
+void liberaLog(Log *l);
+void logWrite(Log *l, const char *fmt, ...);
+
+Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms, int cpu_id, Log *log);
 void liberaEscalonador(Escalonador *esc);
 
 void *rotinaEscalonador(void *arg);
