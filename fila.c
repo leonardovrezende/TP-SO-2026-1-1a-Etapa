@@ -180,6 +180,24 @@ PCB *removePcbFila(FilaProntos *fila, PCB *pcb)
    return removido;
 }
 
+PCB *removeHeap(FilaProntos *fila)
+{
+   pthread_mutex_lock(&fila->mutex);
+   PCB *pcb = heap_pop(fila);
+   pthread_mutex_unlock(&fila->mutex);
+   return pcb;
+}
+
+void travaFila(FilaProntos *fila)
+{
+   pthread_mutex_lock(&fila->mutex);
+}
+
+void destravaFila(FilaProntos *fila)
+{
+   pthread_mutex_unlock(&fila->mutex);
+}
+
 int filaVazia(FilaProntos *fila)
 {
    pthread_mutex_lock(&fila->mutex);

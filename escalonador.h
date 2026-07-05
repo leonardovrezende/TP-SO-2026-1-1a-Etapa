@@ -25,6 +25,7 @@ void logWrite(Log *l, const char *fmt, ...);
 
 Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms, int cpu_id, Log *log);
 void liberaEscalonador(Escalonador *esc);
+void defineParEscalonador(Escalonador *esc, Escalonador *par);
 
 void *rotinaEscalonador(void *arg);
 

@@ -19,6 +19,8 @@ struct Escalonador
 
    PCB *current_process;
    Log *log;
+
+   struct Escalonador *par; /* outro processador, para ajudar processos multithread ociosos */
 };
 
 Log *inicializaLog(){
@@ -67,6 +69,7 @@ Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantu
    esc->cpu_id = cpu_id;
    esc->current_process = NULL;
    esc->log = log;
+   esc->par = NULL;
    return esc;
 }
 
@@ -75,40 +78,123 @@ void liberaEscalonador(Escalonador *esc)
    free(esc);
 }
 
+void defineParEscalonador(Escalonador *esc, Escalonador *par)
+{
+   esc->par = par;
+}
+
 static void despacha(Escalonador *esc, PCB *pcb)
 {
    travaPcb(pcb);
    setEstado(pcb, RUNNING);
-   esc->current_process = pcb;
-   sinalizaPcb(pcb); 
+   sinalizaPcb(pcb);
    destravaPcb(pcb);
+
+   travaFila(esc->fila);
+   esc->current_process = pcb;
+   destravaFila(esc->fila);
+}
+
+/* Processador ocioso (fila vazia): se o outro processador está executando
+ * um processo com mais de uma thread, ajuda executando "outra thread" dele
+ * em vez de ficar parado, conforme a modelagem 1:1 de threads da spec. */
+static int ajudaProcessoParalelo(Escalonador *esc)
+{
+   if (esc->par == NULL)
+      return 0;
+
+   travaFila(esc->fila);
+   PCB *alvo = esc->par->current_process;
+   destravaFila(esc->fila);
+
+   if (alvo == NULL)
+      return 0;
+
+   travaPcb(alvo);
+   if (getEstado(alvo) != RUNNING || getNumThreads(alvo) < 2) {
+      destravaPcb(alvo);
+      return 0;
+   }
+
+   if (esc->tipo == POL_PRIORITY)
+      logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d // processador %d\n",
+               getPid(alvo), getPriority(alvo), esc->cpu_id);
+   else if (esc->tipo == POL_RR)
+      logWrite(esc->log, "[RR] Executando processo PID %d com quantum %dms // processador %d\n",
+               getPid(alvo), esc->quantum_ms, esc->cpu_id);
+   else
+      logWrite(esc->log, "[FCFS] Executando processo PID %d // processador %d\n",
+               getPid(alvo), esc->cpu_id);
+
+   /* O dono pode redespachar o mesmo PCB em pedaços (uma thread termina seu
+    * quantum e volta a READY antes das outras); continuamos ajudando
+    * enquanto o dono ainda for responsável por este processo. */
+   int mesmoDono = 1;
+   while (getEstado(alvo) != FINISHED && mesmoDono) {
+      while (getEstado(alvo) == RUNNING)
+         esperaPcb(alvo);
+      if (getEstado(alvo) == FINISHED)
+         break;
+
+      destravaPcb(alvo);
+      usleep(1000);
+      travaFila(esc->fila);
+      mesmoDono = (esc->par->current_process == alvo);
+      destravaFila(esc->fila);
+      travaPcb(alvo);
+   }
+   destravaPcb(alvo);
+
+   return 1;
+}
+
+static PCB *proximoProcesso(Escalonador *esc)
+{
+   int prioridade = (esc->tipo == POL_PRIORITY);
+
+   if (esc->par == NULL)
+      return prioridade ? esperaPrioritario(esc->fila) : esperaProximo(esc->fila);
+
+   while (1) {
+      PCB *pcb = prioridade ? removeHeap(esc->fila) : removeFila(esc->fila);
+      if (pcb != NULL)
+         return pcb;
+      if (filaVazia(esc->fila) && geradorPronto(esc->fila))
+         return NULL;
+      if (!ajudaProcessoParalelo(esc))
+         usleep(1000);
+   }
 }
 
 static void escalonaFCFS(Escalonador *esc)
 {
    PCB *pcb;
-   while ((pcb = esperaProximo(esc->fila)) != NULL)
+   while ((pcb = proximoProcesso(esc)) != NULL)
    {
       if(NUM_CPUS == 2) logWrite(esc->log, "[FCFS] Executando processo PID %d // processador %d\n", getPid(pcb), esc->cpu_id);
       else logWrite(esc->log, "[FCFS] Executando processo PID %d\n", getPid(pcb));
 
-      while (getEstado(pcb) != FINISHED) {
+      int finalizado;
+      do {
          despacha(esc, pcb);
          travaPcb(pcb);
          while (getEstado(pcb) == RUNNING)
             esperaPcb(pcb); /* aguarda threads sinalizarem READY ou FINISHED */
+         finalizado = (getEstado(pcb) == FINISHED); /* lido ainda com o mutex do pcb travado */
          destravaPcb(pcb);
-      }
+      } while (!finalizado);
 
       logWrite(esc->log, "[FCFS] Processo PID %d finalizado\n", getPid(pcb));
+      travaFila(esc->fila);
       esc->current_process = NULL;
+      destravaFila(esc->fila);
    }
 }
 
 static void escalonaRR(Escalonador *esc)
 {
    PCB *pcb;
-   while ((pcb = esperaProximo(esc->fila)) != NULL)
+   while ((pcb = proximoProcesso(esc)) != NULL)
    {
       if(NUM_CPUS == 2) logWrite(esc->log, "[RR] Executando processo PID %d com quantum %dms // processador %d\n",
               getPid(pcb), esc->quantum_ms, esc->cpu_id);
@@ -130,21 +216,24 @@ static void escalonaRR(Escalonador *esc)
          destravaPcb(pcb);
          insereFila(esc->fila, pcb);
       }
+      travaFila(esc->fila);
       esc->current_process = NULL;
+      destravaFila(esc->fila);
    }
 }
 
 static void escalonaPrioridade(Escalonador *esc)
 {
    PCB *pcb;
-   while ((pcb = esperaPrioritario(esc->fila)) != NULL)
+   while ((pcb = proximoProcesso(esc)) != NULL)
    {
       if(NUM_CPUS == 2) logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d // processador %d\n",
               getPid(pcb), getPriority(pcb), esc->cpu_id);
       else logWrite(esc->log, "[PRIORITY] Executando processo PID %d prioridade %d\n",
               getPid(pcb), getPriority(pcb));
 
-      while (getEstado(pcb) != FINISHED)
+      int finalizado;
+      do
       {
          int preempted = 0;
          despacha(esc, pcb);
@@ -157,7 +246,7 @@ static void escalonaPrioridade(Escalonador *esc)
             {
                setEstado(pcb, READY);
                destravaPcb(pcb);
-               insereFila(esc->fila, pcb);
+               insereHeap(esc->fila, pcb);
                pcb = prox;
                preempted = 1;
 
@@ -170,20 +259,19 @@ static void escalonaPrioridade(Escalonador *esc)
             esperaPcb(pcb);
          }
 
-         if (preempted)
+         if (preempted) {
+            finalizado = 0;
             continue;
-
-         if (getEstado(pcb) == FINISHED)
-         {
-            destravaPcb(pcb);
-            break;
          }
 
+         finalizado = (getEstado(pcb) == FINISHED); /* lido ainda com o mutex do pcb travado */
          destravaPcb(pcb);
-      }
+      } while (!finalizado);
 
       logWrite(esc->log, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb));
+      travaFila(esc->fila);
       esc->current_process = NULL;
+      destravaFila(esc->fila);
    }
 }
 

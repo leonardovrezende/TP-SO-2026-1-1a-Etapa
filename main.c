@@ -53,12 +53,14 @@ int main(int argc, char *argv[])
     Log *log = inicializaLog();
     pthread_t esc_tid, esc_tid2;
     Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS, 0, log);
-    Escalonador *esc2;
-    pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
+    Escalonador *esc2 = NULL;
     if(NUM_CPUS == 2){
         esc2 = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS, 1, log);
-        pthread_create(&esc_tid2, NULL, rotinaEscalonador, esc2);
+        defineParEscalonador(esc, esc2);
+        defineParEscalonador(esc2, esc);
     }
+    pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
+    if(NUM_CPUS == 2) pthread_create(&esc_tid2, NULL, rotinaEscalonador, esc2);
 
     int tempoAnterior = 0;
     for(int i=0; i < n_processos; i++){
