@@ -118,9 +118,13 @@ static int ajudaProcessoParalelo(Escalonador *esc)
 
    /* O dono pode redespachar o mesmo PCB em pedaços (uma thread termina seu
     * quantum e volta a READY antes das outras); continuamos ajudando
-    * enquanto o dono ainda for responsável por este processo. */
+    * enquanto o dono ainda for responsável por este processo. Mas paramos
+    * assim que outro processo ficar pronto na fila: os processadores dão
+    * vazão a PROCESSOS, e só atendem threads do mesmo processo em paralelo
+    * quando não há mais de um processo pronto (spec, obs.txt). */
    int mesmoDono = 1;
-   while (getEstado(alvo) != FINISHED && mesmoDono) {
+   int filaTemProcesso = 0;
+   while (getEstado(alvo) != FINISHED && mesmoDono && !filaTemProcesso) {
       while (getEstado(alvo) == RUNNING)
          esperaPcb(alvo);
       if (getEstado(alvo) == FINISHED)
@@ -131,6 +135,7 @@ static int ajudaProcessoParalelo(Escalonador *esc)
       travaFila(esc->fila);
       mesmoDono = (esc->par->current_process == alvo);
       destravaFila(esc->fila);
+      filaTemProcesso = !filaVazia(esc->fila);
       travaPcb(alvo);
    }
    destravaPcb(alvo);
