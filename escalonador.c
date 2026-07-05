@@ -45,21 +45,6 @@ void logWrite(Log *l, const char *fmt, ...) {
     va_end(args);
 }
 
-static const char *rotulo(TipoEscalonador tipo)
-{
-   switch (tipo)
-   {
-   case POL_FCFS:
-      return "FCFS";
-   case POL_RR:
-      return "RR";
-   case POL_PRIORITY:
-      return "PRIORITY";
-   default:
-      return "?";
-   }
-}
-
 Escalonador *criaEscalonador(TipoEscalonador tipo, FilaProntos *fila, int quantum_ms, int cpu_id, Log *log)
 {
    Escalonador *esc = calloc(1, sizeof(Escalonador));
@@ -86,7 +71,12 @@ void defineParEscalonador(Escalonador *esc, Escalonador *par)
 static void despacha(Escalonador *esc, PCB *pcb)
 {
    travaPcb(pcb);
-   setEstado(pcb, RUNNING);
+   /* a ultima thread do processo pode ter marcado FINISHED entre o
+    * escalonador ler "nao terminou" e conseguir o lock aqui de novo;
+    * nesse caso nao ha mais threads vivas para sinalizar de volta, e
+    * sobrescrever para RUNNING travaria o escalonador para sempre. */
+   if (getEstado(pcb) != FINISHED)
+      setEstado(pcb, RUNNING);
    sinalizaPcb(pcb);
    destravaPcb(pcb);
 

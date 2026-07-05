@@ -230,22 +230,6 @@ int geradorPronto(FilaProntos *fila)
    return pronto;
 }
 
-static PCB *removeIndex(FilaProntos *fila, int index)
-{
-   int abs = (fila->inicio + index) % fila->capacidade;
-   PCB *pcb = fila->itens[abs];
-   for (int i = index; i < fila->qtd - 1; i++)
-   {
-      int a = (fila->inicio + i) % fila->capacidade;
-      int b = (fila->inicio + i + 1) % fila->capacidade;
-      fila->itens[a] = fila->itens[b];
-   }
-   int ultimo = (fila->inicio + fila->qtd - 1) % fila->capacidade;
-   fila->itens[ultimo] = NULL;
-   fila->qtd--;
-   return pcb;
-}
-
 PCB *esperaProximo(FilaProntos *fila)
 {
    pthread_mutex_lock(&fila->mutex);
