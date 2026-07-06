@@ -15,6 +15,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Leitura do aqruivo de entrada
     FILE *f = fopen(argv[1], "r");
     if (!f) {
         perror("fopen");
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
     int n_threads = 0;
     int coloc_threads = 0;
     
+    // Le as informações de cada processo
     PCB **pcb_list = calloc(n_processos, sizeof(PCB*));
     for (int i = 0; i < n_processos; i++){
         pcb_list[i] = leProcesso(f, i + 1);
@@ -45,12 +47,16 @@ int main(int argc, char *argv[])
 
     fclose(f);
 
+    // Ordena por ordem de chegada
     qsort(pcb_list, n_processos, sizeof(PCB*), ordenaPCB);
     //insere processos na fila por tempo de chegada
     FilaProntos *fila = criaFila(n_processos);
     TCB **threads = calloc(n_threads, sizeof(TCB*));
 
+    // Funçao para escrita no arquivo de log_execucao_minikernel
     Log *log = inicializaLog();
+
+    // Inicializa o(s) escalonador(es)
     pthread_t esc_tid, esc_tid2;
     Escalonador *esc = criaEscalonador((TipoEscalonador)politica, fila, QUANTUM_PADRAO_MS, 0, log);
     Escalonador *esc2 = NULL;
@@ -62,18 +68,29 @@ int main(int argc, char *argv[])
     pthread_create(&esc_tid, NULL, rotinaEscalonador, esc);
     if(NUM_CPUS == 2) pthread_create(&esc_tid2, NULL, rotinaEscalonador, esc2);
 
+    // Inserção dos processos na fila de prontos na hora exata de chegada
     int tempoAnterior = 0;
     for(int i=0; i < n_processos; i++){
+        // Garante que os processos cheguem na hora certa
         usleep((getStartTime(pcb_list[i]) - tempoAnterior) * 1000);
+
+        // Para o calculo do tempo de espera até a próxima inserção
         tempoAnterior = getStartTime(pcb_list[i]);
+
+        // Cria as threads do processo
         for(int j=0; j < getNumThreads(pcb_list[i]); j++){
             threads[coloc_threads++] = criaThread(pcb_list[i], j);
         }
+
+        // Se for prioridade, fila se comporta como heap
         if(politica == 3) insereHeap(fila, pcb_list[i]);
+
+        // caso contrário, como fila circular
         else insereFila(fila, pcb_list[i]);
     }
     marcaGeradorPronto(fila);
 
+    // Espera finalização dos escalonadores e das threads
     pthread_join(esc_tid, NULL);
     if(NUM_CPUS == 2) pthread_join(esc_tid2, NULL);
 
@@ -82,6 +99,8 @@ int main(int argc, char *argv[])
     }
 
     logWrite(log, "Escalonador terminou execução de todos processos\n");
+
+    // Liberações de memória
     liberaLog(log);
 
     for (int i = 0; i < n_processos; i++)
