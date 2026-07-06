@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < n_processos; i++){
         joinThreads(pcb_list[i]);
-        //logWrite(log, "[PRIORITY] Processo PID %d finalizado\n", getPid(pcb_list[i]));
     }
 
     logWrite(log, "Escalonador terminou execução de todos processos\n");

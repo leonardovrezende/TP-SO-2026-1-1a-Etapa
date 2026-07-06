@@ -274,8 +274,6 @@ void *rotinaEscalonador(void *arg)
 {
    Escalonador *esc = (Escalonador *)arg;
 
-   //esc->log_file = fopen("log_execucao_minikernel.txt", "w");
-
    switch (esc->tipo)
    {
    case POL_RR:
@@ -289,10 +287,6 @@ void *rotinaEscalonador(void *arg)
       escalonaFCFS(esc);
       break;
    }
-
-   //logWrite(esc->log, "Escalonador terminou execução de todos processos\n");
-   //fclose(esc->log);
-   //esc->log = NULL;
 
    return NULL;
 }
