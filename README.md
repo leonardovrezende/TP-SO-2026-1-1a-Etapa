@@ -1,6 +1,6 @@
 # Mini-Kernel Multithread — Escalonamento FCFS, RR e Prioridade Preemptiva
 
-Alunos: Leonardo Vitório Rezende (2024102899) e Mateus Silva Lizardo (2024101222)
+Alunos: Leonardo Vitório Rezende e Mateus Silva Lizardo
 
 Trabalho Prático de Sistemas Operacionais (INF15980) — UFES. Simula um
 escalonador de processos *multithread* em C, usando threads POSIX
